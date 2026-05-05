@@ -1,0 +1,1475 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>Smart Process Scheduler</title>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;900&family=DM+Sans:wght@300;400;500;600;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet"/>
+<style>
+/* ═══════════════════════════════════════════
+   DESIGN TOKENS
+═══════════════════════════════════════════ */
+:root {
+  --r: 18px;
+  --r-sm: 10px;
+  --r-lg: 28px;
+  --gap: 14px;
+  --trans: all .35s cubic-bezier(.4,0,.2,1);
+}
+
+[data-theme="dark"] {
+  --bg:       #0c0e14;
+  --bg2:      #111420;
+  --glass:    rgba(255,255,255,0.03);
+  --glass2:   rgba(255,255,255,0.06);
+  --border:   rgba(255,255,255,0.07);
+  --border2:  rgba(255,255,255,0.12);
+  --text:     #f0f2ff;
+  --text2:    #8892b0;
+  --text3:    #4a5580;
+  --gold:     #f5c842;
+  --gold2:    #e8a020;
+  --teal:     #2dd4bf;
+  --pink:     #f472b6;
+  --red:      #fb7185;
+  --green:    #4ade80;
+  --blue:     #60a5fa;
+  --purple:   #a78bfa;
+  --shadow:   0 8px 40px rgba(0,0,0,0.6);
+  --shadow-sm:0 4px 20px rgba(0,0,0,0.4);
+}
+
+[data-theme="light"] {
+  --bg:       #f0f0f5;
+  --bg2:      #e8e8f0;
+  --glass:    rgba(255,255,255,0.7);
+  --glass2:   rgba(255,255,255,0.9);
+  --border:   rgba(0,0,0,0.06);
+  --border2:  rgba(0,0,0,0.12);
+  --text:     #0f1123;
+  --text2:    #4a5580;
+  --text3:    #9aa0be;
+  --gold:     #d4940a;
+  --gold2:    #b87a08;
+  --teal:     #0d9488;
+  --pink:     #db2777;
+  --red:      #e11d48;
+  --green:    #16a34a;
+  --blue:     #2563eb;
+  --purple:   #7c3aed;
+  --shadow:   0 8px 40px rgba(0,0,0,0.12);
+  --shadow-sm:0 4px 20px rgba(0,0,0,0.08);
+}
+
+/* ═══════════════════════════════════════════
+   BASE
+═══════════════════════════════════════════ */
+*{margin:0;padding:0;box-sizing:border-box;}
+html,body{min-height:100vh;font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);transition:background .4s,color .4s;overflow-x:hidden;}
+.mono{font-family:'DM Mono',monospace;}
+.serif{font-family:'Playfair Display',serif;}
+
+/* ANIMATED BACKGROUND */
+body::before{
+  content:'';position:fixed;inset:0;z-index:0;
+  background:
+    radial-gradient(ellipse 60% 40% at 20% 10%,rgba(245,200,66,0.06) 0%,transparent 60%),
+    radial-gradient(ellipse 50% 35% at 80% 80%,rgba(45,212,191,0.05) 0%,transparent 60%),
+    radial-gradient(ellipse 40% 30% at 60% 30%,rgba(164,139,250,0.04) 0%,transparent 60%);
+  pointer-events:none;
+}
+[data-theme="light"] body::before{
+  background:
+    radial-gradient(ellipse 60% 40% at 20% 10%,rgba(245,200,66,0.12) 0%,transparent 60%),
+    radial-gradient(ellipse 50% 35% at 80% 80%,rgba(45,212,191,0.10) 0%,transparent 60%);
+}
+
+/* SCROLLBAR */
+::-webkit-scrollbar{width:4px;height:4px;}
+::-webkit-scrollbar-track{background:transparent;}
+::-webkit-scrollbar-thumb{background:var(--border2);border-radius:9px;}
+
+/* ICONS */
+.material-symbols-rounded{font-variation-settings:'FILL' 1,'wght' 400,'GRAD' 0,'opsz' 24;vertical-align:middle;font-size:20px;}
+
+/* ═══════════════════════════════════════════
+   ANIMATIONS
+═══════════════════════════════════════════ */
+@keyframes slideUp{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:translateY(0)}}
+@keyframes fadeIn{from{opacity:0}to{opacity:1}}
+@keyframes spinZ{to{transform:rotate(360deg)}}
+@keyframes heartbeat{0%,100%{transform:scale(1)}50%{transform:scale(1.4)}}
+@keyframes shimmer{0%{background-position:-200% center}100%{background-position:200% center}}
+@keyframes floatUp{0%,100%{transform:translateY(0)}50%{transform:translateY(-6px)}}
+@keyframes glow-breathe{0%,100%{box-shadow:0 0 20px rgba(245,200,66,0.2)}50%{box-shadow:0 0 40px rgba(245,200,66,0.5)}}
+
+.anim-slide{animation:slideUp .5s cubic-bezier(.4,0,.2,1) both;}
+.anim-fade{animation:fadeIn .4s ease both;}
+.spin{animation:spinZ .9s linear infinite;}
+.pulse{animation:heartbeat 1.6s ease-in-out infinite;}
+.float{animation:floatUp 3s ease-in-out infinite;}
+
+/* ═══════════════════════════════════════════
+   LAYOUT
+═══════════════════════════════════════════ */
+.app-wrapper{
+  position:relative;z-index:1;
+  display:grid;
+  grid-template-rows:auto 1fr auto;
+  min-height:100vh;
+}
+
+/* ═══════════════════════════════════════════
+   HEADER
+═══════════════════════════════════════════ */
+.topbar{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:14px 28px;
+  background:var(--glass2);
+  backdrop-filter:blur(24px);
+  border-bottom:1px solid var(--border);
+  position:sticky;top:0;z-index:100;
+  transition:var(--trans);
+}
+.brand{display:flex;align-items:center;gap:14px;}
+.brand-icon{
+  width:42px;height:42px;border-radius:14px;
+  background:linear-gradient(135deg,var(--gold2),var(--gold));
+  display:flex;align-items:center;justify-content:center;
+  box-shadow:0 0 24px rgba(245,200,66,0.35);
+  animation:floatUp 4s ease-in-out infinite;
+  position:relative;
+  flex-shrink:0;
+}
+.brand-icon .material-symbols-rounded{color:#000;font-size:22px;}
+.brand-text h1{
+  font-family:'Playfair Display',serif;
+  font-size:15px;font-weight:700;
+  background:linear-gradient(90deg,var(--gold),var(--teal));
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;
+  letter-spacing:-0.3px;
+}
+.brand-text p{font-size:9px;color:var(--text3);font-weight:600;letter-spacing:3px;text-transform:uppercase;margin-top:1px;}
+
+.hdr-pills{display:flex;align-items:center;gap:8px;}
+.pill{
+  display:inline-flex;align-items:center;gap:5px;
+  padding:5px 14px;border-radius:30px;font-size:10px;font-weight:600;
+  border:1px solid var(--border2);background:var(--glass);
+  cursor:pointer;transition:var(--trans);font-family:'DM Mono',monospace;
+  color:var(--text2);
+}
+.pill:hover{border-color:var(--gold);color:var(--gold);}
+.pill-live{display:none;border-color:rgba(74,222,128,0.3);background:rgba(74,222,128,0.06);color:var(--green);}
+.pill-ml{display:none;border-color:rgba(167,139,250,0.3);background:rgba(167,139,250,0.06);color:var(--purple);}
+.pill-dot{width:6px;height:6px;border-radius:50%;}
+.theme-toggle{
+  width:38px;height:38px;border-radius:12px;
+  border:1px solid var(--border2);background:var(--glass);
+  display:flex;align-items:center;justify-content:center;
+  cursor:pointer;transition:var(--trans);color:var(--text2);
+}
+.theme-toggle:hover{border-color:var(--gold);color:var(--gold);background:rgba(245,200,66,0.08);}
+
+/* ═══════════════════════════════════════════
+   MAIN CONTENT
+═══════════════════════════════════════════ */
+.content{
+  padding:22px 28px;
+  display:grid;
+  grid-template-columns:360px 1fr;
+  gap:var(--gap);
+  max-width:1700px;
+  margin:0 auto;
+  width:100%;
+}
+@media(max-width:1100px){.content{grid-template-columns:1fr;}}
+
+/* ═══════════════════════════════════════════
+   GLASS CARD
+═══════════════════════════════════════════ */
+.card{
+  background:var(--glass);
+  border:1px solid var(--border);
+  border-radius:var(--r);
+  backdrop-filter:blur(16px);
+  transition:var(--trans);
+  overflow:hidden;
+}
+.card:hover{border-color:var(--border2);}
+.card-hd{
+  padding:16px 20px;
+  display:flex;align-items:center;justify-content:space-between;
+  border-bottom:1px solid var(--border);
+}
+.card-hd-l{display:flex;align-items:center;gap:9px;}
+.card-hd-icon{
+  width:32px;height:32px;border-radius:9px;
+  display:flex;align-items:center;justify-content:center;
+  flex-shrink:0;
+}
+.card-hd-icon .material-symbols-rounded{font-size:17px;}
+.card-title{font-size:12px;font-weight:700;color:var(--text);text-transform:uppercase;letter-spacing:1px;}
+.card-body{padding:18px 20px;}
+
+/* ═══════════════════════════════════════════
+   LEFT COLUMN
+═══════════════════════════════════════════ */
+.left-col{display:flex;flex-direction:column;gap:var(--gap);}
+
+/* ADD PROCESS */
+.add-card .card-hd-icon{background:rgba(245,200,66,0.12);}
+.add-card .card-hd-icon .material-symbols-rounded{color:var(--gold);}
+
+.field-label{
+  display:block;font-size:9px;font-weight:700;
+  color:var(--text3);text-transform:uppercase;letter-spacing:2.5px;margin-bottom:6px;
+}
+input[type=text],input[type=number],select{
+  width:100%;height:42px;padding:0 14px;
+  background:var(--bg2);
+  border:1px solid var(--border2);
+  border-radius:var(--r-sm);
+  color:var(--text);font-size:13px;font-family:'DM Sans',sans-serif;
+  outline:none;transition:var(--trans);
+}
+input:focus,select:focus{
+  border-color:var(--gold);
+  box-shadow:0 0 0 3px rgba(245,200,66,0.12);
+}
+select option{background:var(--bg2);}
+
+.grid-2{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+.field-gap{display:flex;flex-direction:column;gap:5px;}
+
+.btn{
+  display:inline-flex;align-items:center;justify-content:center;gap:7px;
+  height:42px;padding:0 18px;border-radius:var(--r-sm);
+  font-size:13px;font-weight:600;cursor:pointer;
+  transition:var(--trans);border:none;font-family:'DM Sans',sans-serif;
+}
+.btn-outline{
+  background:transparent;border:1px solid var(--border2);color:var(--text2);
+}
+.btn-outline:hover{border-color:var(--gold);color:var(--gold);background:rgba(245,200,66,0.06);}
+.btn-del{
+  background:transparent;border:1px solid rgba(251,113,133,0.25);
+  color:var(--red);width:42px;padding:0;
+}
+.btn-del:hover{background:rgba(251,113,133,0.1);}
+.btn-primary{
+  background:linear-gradient(135deg,var(--gold2),var(--gold));
+  color:#000;font-weight:700;height:48px;font-size:14px;
+  border-radius:var(--r-sm);width:100%;
+  box-shadow:0 4px 20px rgba(245,200,66,0.25);
+}
+.btn-primary:hover{box-shadow:0 6px 30px rgba(245,200,66,0.45);transform:translateY(-1px);}
+.btn-primary:active{transform:translateY(0);}
+.btn:disabled{opacity:.45;cursor:not-allowed;transform:none !important;}
+
+/* PROCESS QUEUE */
+.queue-card .card-hd-icon{background:rgba(45,212,191,0.10);}
+.queue-card .card-hd-icon .material-symbols-rounded{color:var(--teal);}
+.queue-count-badge{
+  padding:3px 12px;border-radius:20px;font-size:10px;font-weight:700;
+  background:rgba(45,212,191,0.10);border:1px solid rgba(45,212,191,0.2);
+  color:var(--teal);font-family:'DM Mono',monospace;
+}
+.proc-scroll{max-height:200px;overflow-y:auto;padding:8px;}
+.proc-row{
+  display:flex;align-items:center;gap:8px;
+  padding:8px 10px;border-radius:10px;
+  border:1px solid transparent;
+  transition:var(--trans);
+  cursor:default;
+}
+.proc-row:hover{background:var(--glass2);border-color:var(--border);}
+.proc-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0;}
+.proc-name{font-size:12px;font-weight:700;font-family:'DM Mono',monospace;color:var(--text);width:34px;}
+.proc-meta{font-size:10px;color:var(--text3);}
+.proc-meta b{color:var(--text2);}
+
+/* ML MODEL INFO */
+.ml-card .card-hd-icon{background:rgba(167,139,250,0.10);}
+.ml-card .card-hd-icon .material-symbols-rounded{color:var(--purple);}
+.mi-row{
+  display:flex;justify-content:space-between;align-items:center;
+  padding:9px 0;border-bottom:1px solid var(--border);
+}
+.mi-row:last-child{border-bottom:none;}
+.mi-lbl{font-size:10px;color:var(--text3);}
+.mi-val{font-size:11px;font-weight:600;color:var(--text2);font-family:'DM Mono',monospace;text-align:right;max-width:58%;}
+
+/* ═══════════════════════════════════════════
+   RIGHT COLUMN
+═══════════════════════════════════════════ */
+.right-col{display:flex;flex-direction:column;gap:var(--gap);}
+
+/* ML RECOMMENDATION BANNER */
+.ml-banner{
+  display:none;
+  border-radius:var(--r);overflow:hidden;
+  border:1px solid rgba(245,200,66,0.2);
+  background:linear-gradient(135deg,rgba(245,200,66,0.06),rgba(232,160,32,0.04));
+  padding:20px 24px;
+  flex-direction:row;align-items:center;gap:20px;
+  position:relative;
+}
+.ml-banner::after{
+  content:'';position:absolute;inset:0;
+  background:linear-gradient(135deg,transparent 60%,rgba(245,200,66,0.03));
+  pointer-events:none;
+}
+.ml-banner-icon{
+  width:52px;height:52px;border-radius:16px;flex-shrink:0;
+  background:linear-gradient(135deg,var(--gold2),var(--gold));
+  display:flex;align-items:center;justify-content:center;
+  box-shadow:0 0 24px rgba(245,200,66,0.4);
+  animation:glow-breathe 3s ease-in-out infinite;
+}
+.ml-banner-icon .material-symbols-rounded{color:#000;font-size:26px;}
+.ml-banner-body{flex:1;}
+.ml-banner-label{font-size:9px;font-weight:700;color:var(--gold);text-transform:uppercase;letter-spacing:3px;margin-bottom:4px;}
+.ml-banner-algo{font-size:18px;font-weight:700;font-family:'Playfair Display',serif;color:var(--text);}
+.ml-banner-reason{font-size:11px;color:var(--text2);margin-top:3px;}
+.ml-banner-conf{text-align:right;flex-shrink:0;}
+.ml-banner-conf-lbl{font-size:9px;color:var(--text3);letter-spacing:2px;text-transform:uppercase;margin-bottom:4px;}
+.ml-banner-conf-val{font-size:32px;font-weight:700;color:var(--gold);font-family:'DM Mono',monospace;}
+
+/* TAB BAR */
+.tab-bar{
+  display:flex;gap:4px;padding:5px;
+  background:var(--glass);border:1px solid var(--border);
+  border-radius:var(--r);overflow-x:auto;
+}
+.tab-btn{
+  flex:1;white-space:nowrap;
+  padding:9px 14px;border-radius:12px;
+  font-size:10px;font-weight:700;letter-spacing:.8px;text-transform:uppercase;
+  border:none;cursor:pointer;transition:var(--trans);
+  background:transparent;color:var(--text3);font-family:'DM Sans',sans-serif;
+  display:flex;align-items:center;justify-content:center;gap:5px;
+}
+.tab-btn:hover{color:var(--text2);background:var(--glass2);}
+.tab-btn.active{
+  background:linear-gradient(135deg,rgba(245,200,66,0.2),rgba(245,200,66,0.08));
+  color:var(--gold);border:1px solid rgba(245,200,66,0.25);
+}
+.tab-btn .material-symbols-rounded{font-size:15px;}
+
+/* ═══════════════════════════════════════════
+   STATS BENTO
+═══════════════════════════════════════════ */
+.stats-bento{display:grid;grid-template-columns:repeat(3,1fr);gap:var(--gap);}
+.stat-tile{
+  background:var(--glass);border:1px solid var(--border);
+  border-radius:var(--r);padding:18px 20px;
+  transition:var(--trans);position:relative;overflow:hidden;
+}
+.stat-tile:hover{border-color:var(--border2);transform:translateY(-2px);}
+.stat-tile::before{
+  content:'';position:absolute;bottom:0;left:0;right:0;height:3px;
+  background:linear-gradient(90deg,var(--gold2),var(--gold),var(--teal));
+  opacity:.5;
+}
+.stat-tile-label{font-size:9px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:2px;margin-bottom:10px;}
+.stat-tile-val{
+  font-size:30px;font-weight:700;color:var(--text);
+  font-family:'DM Mono',monospace;line-height:1;
+}
+.stat-tile-unit{font-size:10px;color:var(--text3);margin-top:5px;}
+
+/* ═══════════════════════════════════════════
+   RESULTS TABLE
+═══════════════════════════════════════════ */
+.results-card .card-hd-icon{background:rgba(96,165,250,0.10);}
+.results-card .card-hd-icon .material-symbols-rounded{color:var(--blue);}
+.algo-badge{
+  padding:4px 12px;border-radius:20px;font-size:10px;font-weight:700;
+  background:rgba(96,165,250,0.10);border:1px solid rgba(96,165,250,0.2);
+  color:var(--blue);font-family:'DM Mono',monospace;
+}
+
+table{width:100%;border-collapse:collapse;}
+thead tr{background:var(--bg2);}
+th{
+  padding:10px 14px;text-align:left;
+  font-size:9px;font-weight:700;color:var(--text3);
+  text-transform:uppercase;letter-spacing:2px;
+  border-bottom:1px solid var(--border);
+}
+td{padding:10px 14px;border-bottom:1px solid var(--border);color:var(--text2);font-size:12px;}
+tr:last-child td{border-bottom:none;}
+tbody tr{transition:background .2s;}
+tbody tr:hover{background:var(--glass2);}
+
+/* CHIPS */
+.chip{
+  display:inline-block;padding:3px 9px;border-radius:6px;
+  font-size:9px;font-weight:700;text-transform:uppercase;font-family:'DM Mono',monospace;
+}
+.chip-cpu{background:rgba(96,165,250,0.12);color:var(--blue);border:1px solid rgba(96,165,250,0.2);}
+.chip-io{background:rgba(245,200,66,0.12);color:var(--gold);border:1px solid rgba(245,200,66,0.2);}
+.chip-run{background:rgba(74,222,128,0.12);color:var(--green);border:1px solid rgba(74,222,128,0.2);}
+.chip-slp{background:rgba(148,163,184,0.1);color:var(--text3);border:1px solid var(--border);}
+.chip-wait{background:rgba(245,200,66,0.1);color:var(--gold);border:1px solid rgba(245,200,66,0.2);}
+.chip-pre{background:rgba(251,113,133,0.12);color:var(--red);border:1px solid rgba(251,113,133,0.2);}
+.chip-nonpre{background:var(--glass2);color:var(--text3);border:1px solid var(--border);}
+.chip-ml{background:linear-gradient(135deg,var(--gold2),var(--gold));color:#000;font-weight:800;}
+.chip-best{background:rgba(74,222,128,0.12);color:var(--green);border:1px solid rgba(74,222,128,0.25);}
+
+/* PID TAG */
+.pid-tag{
+  display:inline-flex;align-items:center;gap:6px;
+  padding:3px 9px;border-radius:6px;
+  font-size:11px;font-weight:700;font-family:'DM Mono',monospace;
+}
+
+/* ═══════════════════════════════════════════
+   GANTT CHART
+═══════════════════════════════════════════ */
+.gantt-card .card-hd-icon{background:rgba(45,212,191,0.10);}
+.gantt-card .card-hd-icon .material-symbols-rounded{color:var(--teal);}
+.gantt-row-wrap{display:flex;align-items:center;gap:12px;margin-bottom:10px;}
+.gantt-pid{font-size:11px;font-weight:700;color:var(--text2);width:36px;text-align:right;flex-shrink:0;font-family:'DM Mono',monospace;}
+.gantt-track{flex:1;height:36px;background:var(--bg2);border-radius:10px;position:relative;overflow:hidden;border:1px solid var(--border);}
+.gantt-block{
+  position:absolute;height:100%;
+  display:flex;align-items:center;justify-content:center;
+  font-size:10px;font-weight:800;color:#000;
+  border-radius:8px;font-family:'DM Mono',monospace;
+  transition:width .6s cubic-bezier(.4,0,.2,1);
+}
+.gantt-wait-bg{position:absolute;height:100%;border-radius:8px;opacity:.12;}
+.gantt-meta{font-size:9px;color:var(--text3);width:78px;flex-shrink:0;font-family:'DM Mono',monospace;}
+
+/* ═══════════════════════════════════════════
+   COMPARISON
+═══════════════════════════════════════════ */
+.cmp-card .card-hd-icon{background:rgba(244,114,182,0.10);}
+.cmp-card .card-hd-icon .material-symbols-rounded{color:var(--pink);}
+.cmp-best td{background:rgba(74,222,128,0.03);}
+
+/* ═══════════════════════════════════════════
+   DAA ANALYSIS
+═══════════════════════════════════════════ */
+.daa-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;}
+.daa-card{
+  background:var(--glass);border:1px solid var(--border);
+  border-radius:var(--r);padding:18px;
+  transition:var(--trans);
+}
+.daa-card:hover{border-color:var(--border2);transform:translateY(-2px);}
+.daa-hd{display:flex;align-items:center;gap:8px;margin-bottom:14px;}
+.daa-name{font-size:13px;font-weight:700;font-family:'Playfair Display',serif;color:var(--text);}
+.complexity-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px;}
+.cplx-box{padding:10px;border-radius:10px;background:var(--bg2);text-align:center;}
+.cplx-lbl{font-size:8px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:2px;}
+.cplx-val{font-size:16px;font-weight:700;font-family:'DM Mono',monospace;margin-top:4px;}
+.daa-desc{font-size:11px;color:var(--text3);line-height:1.7;}
+.daa-struct{font-size:10px;color:var(--text3);padding:8px 10px;background:var(--bg2);border-radius:8px;margin-bottom:10px;}
+.daa-struct b{color:var(--text2);}
+
+/* ═══════════════════════════════════════════
+   LIVE MONITOR
+═══════════════════════════════════════════ */
+.monitor-col{display:flex;flex-direction:column;gap:var(--gap);}
+.gauges-row{display:grid;grid-template-columns:1fr 1fr 1fr;gap:var(--gap);}
+
+/* CPU Gauge */
+.gauge-card{background:var(--glass);border:1px solid var(--border);border-radius:var(--r);padding:20px;display:flex;flex-direction:column;align-items:center;transition:var(--trans);}
+.gauge-card:hover{border-color:var(--border2);}
+.gauge-title{font-size:9px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:2px;margin-bottom:16px;}
+.gauge-svg-wrap{position:relative;width:120px;height:120px;}
+.gauge-svg{width:100%;height:100%;transform:rotate(-90deg);}
+.gauge-ring-bg{stroke:#1a2d3f;}
+[data-theme="light"] .gauge-ring-bg{stroke:#dde2ef;}
+.gauge-ring{transition:stroke-dashoffset .8s cubic-bezier(.4,0,.2,1),stroke .3s;}
+.gauge-inner{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;}
+.gauge-pct{font-size:22px;font-weight:700;color:var(--text);font-family:'DM Mono',monospace;}
+.gauge-sub{font-size:9px;color:var(--text3);font-weight:600;}
+.gauge-footer{margin-top:12px;width:100%;display:flex;flex-direction:column;gap:4px;}
+.gauge-ft-row{display:flex;justify-content:space-between;font-size:10px;}
+.gauge-ft-lbl{color:var(--text3);}
+.gauge-ft-val{color:var(--text2);font-family:'DM Mono',monospace;font-weight:600;}
+
+/* RAM Card */
+.ram-card{background:var(--glass);border:1px solid var(--border);border-radius:var(--r);padding:20px;transition:var(--trans);}
+.ram-card:hover{border-color:var(--border2);}
+.bar-wrap{margin-bottom:14px;}
+.bar-label-row{display:flex;justify-content:space-between;margin-bottom:6px;}
+.bar-lbl{font-size:11px;font-weight:600;color:var(--text2);}
+.bar-val{font-size:11px;font-weight:700;color:var(--text);font-family:'DM Mono',monospace;}
+.bar-track{height:8px;background:var(--bg2);border-radius:4px;overflow:hidden;border:1px solid var(--border);}
+.bar-fill{height:100%;border-radius:4px;transition:width .6s cubic-bezier(.4,0,.2,1);}
+.bar-pct{font-size:9px;color:var(--text3);text-align:right;margin-top:3px;font-family:'DM Mono',monospace;}
+.ram-avail-row{padding-top:12px;border-top:1px solid var(--border);font-size:10px;color:var(--text3);}
+.ram-avail-row span{color:var(--text2);font-family:'DM Mono',monospace;font-weight:600;}
+
+/* CPU Sparkline */
+.sparkline-card .card-hd-icon{background:rgba(45,212,191,0.10);}
+.sparkline-card .card-hd-icon .material-symbols-rounded{color:var(--teal);}
+#cpu-sparkline{display:block;width:100%;height:120px;}
+
+/* Cores */
+.cores-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;}
+.core-tile{background:var(--bg2);border:1px solid var(--border);border-radius:10px;padding:10px;}
+.core-label-row{display:flex;justify-content:space-between;align-items:center;margin-bottom:7px;}
+.core-lbl{font-size:8px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:1px;}
+.core-pct-lbl{font-size:11px;font-weight:700;font-family:'DM Mono',monospace;}
+.core-bar-track{height:5px;background:var(--glass2);border-radius:3px;overflow:hidden;}
+.core-bar-fill{height:100%;border-radius:3px;transition:width .5s cubic-bezier(.4,0,.2,1);}
+
+/* ═══════════════════════════════════════════
+   HISTORY
+═══════════════════════════════════════════ */
+.hist-card .card-hd-icon{background:rgba(167,139,250,0.10);}
+.hist-card .card-hd-icon .material-symbols-rounded{color:var(--purple);}
+.refresh-btn{
+  font-size:11px;font-weight:700;color:var(--gold);
+  background:none;border:none;cursor:pointer;transition:color .2s;
+}
+.refresh-btn:hover{color:var(--teal);}
+
+/* ═══════════════════════════════════════════
+   EMPTY STATE
+═══════════════════════════════════════════ */
+.empty-state{
+  padding:36px;text-align:center;color:var(--text3);
+  display:flex;flex-direction:column;align-items:center;gap:10px;
+}
+.empty-state .material-symbols-rounded{font-size:38px;opacity:.2;}
+.empty-state p{font-size:12px;}
+
+/* ═══════════════════════════════════════════
+   TOAST
+═══════════════════════════════════════════ */
+#toast{
+  position:fixed;top:76px;right:22px;z-index:9999;
+  padding:13px 20px;border-radius:12px;font-size:13px;font-weight:600;
+  font-family:'DM Mono',monospace;max-width:290px;display:none;
+  box-shadow:var(--shadow);
+  animation:slideUp .3s cubic-bezier(.4,0,.2,1);
+}
+
+/* ═══════════════════════════════════════════
+   FOOTER
+═══════════════════════════════════════════ */
+footer{
+  position:relative;z-index:1;
+  text-align:center;padding:20px;
+  border-top:1px solid var(--border);
+  font-size:9px;color:var(--text3);
+  text-transform:uppercase;letter-spacing:3px;
+  font-family:'DM Mono',monospace;
+}
+</style>
+</head>
+<body>
+<div class="app-wrapper">
+
+<!-- ═══ TOPBAR ═══ -->
+<header class="topbar">
+  <div class="brand">
+    <div class="brand-icon float">
+      <span class="material-symbols-rounded">memory</span>
+    </div>
+    <div class="brand-text">
+      <h1>Smart Process Scheduler</h1>
+      <p>ML · OS · DBMS · DAA</p>
+    </div>
+  </div>
+  <div class="hdr-pills">
+    <div id="live-indicator" class="pill pill-live">
+      <span class="pill-dot pulse" style="background:var(--green);"></span>
+      LIVE
+    </div>
+    <span id="ml-badge" class="pill pill-ml">
+      <span class="material-symbols-rounded" style="font-size:12px;">psychology</span>
+      RF ACTIVE
+    </span>
+    <button class="theme-toggle" onclick="toggleTheme()" title="Toggle theme">
+      <span id="theme-icon" class="material-symbols-rounded" style="font-size:18px;">light_mode</span>
+    </button>
+  </div>
+</header>
+
+<div id="toast"></div>
+
+<!-- ═══ MAIN ═══ -->
+<main class="content">
+
+  <!-- ═══ LEFT COLUMN ═══ -->
+  <div class="left-col">
+
+    <!-- ADD PROCESS -->
+    <div class="card add-card anim-slide">
+      <div class="card-hd">
+        <div class="card-hd-l">
+          <div class="card-hd-icon">
+            <span class="material-symbols-rounded">add_task</span>
+          </div>
+          <span class="card-title">Add Process</span>
+        </div>
+      </div>
+      <div class="card-body" style="display:flex;flex-direction:column;gap:12px;">
+        <div class="field-gap">
+          <label class="field-label">Process ID</label>
+          <input id="input-pid" type="text" placeholder="e.g. P1"/>
+        </div>
+        <div class="grid-2">
+          <div class="field-gap">
+            <label class="field-label">Burst Time</label>
+            <input id="input-burst" type="number" min="1" placeholder="5"/>
+          </div>
+          <div class="field-gap">
+            <label class="field-label">Arrival Time</label>
+            <input id="input-arrival" type="number" min="0" placeholder="0"/>
+          </div>
+        </div>
+        <div class="grid-2">
+          <div class="field-gap">
+            <label class="field-label">Priority</label>
+            <input id="input-priority" type="number" min="1" max="10" placeholder="5"/>
+          </div>
+          <div class="field-gap">
+            <label class="field-label">Type</label>
+            <select id="input-type">
+              <option value="CPU">CPU Bound</option>
+              <option value="IO">IO Bound</option>
+            </select>
+          </div>
+        </div>
+        <div style="display:flex;gap:8px;">
+          <button id="btn-add" class="btn btn-outline" style="flex:1;" onclick="addProcess()">
+            <span class="material-symbols-rounded" style="font-size:16px;">add</span> Add
+          </button>
+          <button class="btn btn-del" onclick="clearProcesses()" title="Clear all">
+            <span class="material-symbols-rounded" style="font-size:16px;">delete</span>
+          </button>
+        </div>
+        <button id="btn-calculate" class="btn btn-primary" onclick="calculateSchedule()">
+          <span class="material-symbols-rounded" style="font-size:18px;">auto_awesome</span>
+          Calculate Schedule
+        </button>
+      </div>
+    </div>
+
+    <!-- PROCESS QUEUE -->
+    <div class="card queue-card anim-slide" style="animation-delay:.05s">
+      <div class="card-hd">
+        <div class="card-hd-l">
+          <div class="card-hd-icon">
+            <span class="material-symbols-rounded">queue</span>
+          </div>
+          <span class="card-title">Process Queue</span>
+        </div>
+        <span id="queue-count" class="queue-count-badge">0</span>
+      </div>
+      <div id="process-list" class="proc-scroll">
+        <div class="empty-state" style="padding:22px;">
+          <span class="material-symbols-rounded">inbox</span>
+          <p>No processes added yet</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- ML MODEL INFO -->
+    <div class="card ml-card anim-slide" style="animation-delay:.10s">
+      <div class="card-hd">
+        <div class="card-hd-l">
+          <div class="card-hd-icon">
+            <span class="material-symbols-rounded">psychology</span>
+          </div>
+          <span class="card-title">ML Model Info</span>
+        </div>
+      </div>
+      <div class="card-body" style="padding:12px 20px;">
+        <div class="mi-row"><span class="mi-lbl">Type</span><span id="mi-model" class="mi-val">—</span></div>
+        <div class="mi-row"><span class="mi-lbl">Samples</span><span id="mi-samples" class="mi-val">—</span></div>
+        <div class="mi-row"><span class="mi-lbl">Estimators</span><span id="mi-estimators" class="mi-val">—</span></div>
+        <div class="mi-row" style="border-bottom:none;"><span class="mi-lbl">Features</span><span id="mi-features" class="mi-val">—</span></div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ═══ RIGHT COLUMN ═══ -->
+  <div class="right-col">
+
+    <!-- ML RECOMMENDATION BANNER -->
+    <div id="ml-banner" class="ml-banner card">
+      <div class="ml-banner-icon">
+        <span class="material-symbols-rounded">psychology</span>
+      </div>
+      <div class="ml-banner-body">
+        <div class="ml-banner-label">ML Recommendation</div>
+        <div id="ml-algo" class="ml-banner-algo"></div>
+        <div id="ml-reason" class="ml-banner-reason"></div>
+      </div>
+      <div class="ml-banner-conf">
+        <div class="ml-banner-conf-lbl">Confidence</div>
+        <div id="ml-conf" class="ml-banner-conf-val"></div>
+      </div>
+    </div>
+
+    <!-- TAB BAR -->
+    <div class="tab-bar anim-slide" style="animation-delay:.08s">
+      <button class="tab-btn active" onclick="switchTab('results',this)">
+        <span class="material-symbols-rounded">analytics</span> Results
+      </button>
+      <button class="tab-btn" onclick="switchTab('gantt',this)">
+        <span class="material-symbols-rounded">timeline</span> Gantt
+      </button>
+      <button class="tab-btn" onclick="switchTab('comparison',this)">
+        <span class="material-symbols-rounded">compare</span> Compare
+      </button>
+      <button class="tab-btn" onclick="switchTab('daa',this)">
+        <span class="material-symbols-rounded">functions</span> DAA
+      </button>
+      <button class="tab-btn" onclick="switchTab('monitor',this)">
+        <span class="material-symbols-rounded">monitor_heart</span> Monitor
+      </button>
+      <button class="tab-btn" onclick="switchTab('history',this)">
+        <span class="material-symbols-rounded">history</span> History
+      </button>
+    </div>
+
+    <!-- ══ RESULTS TAB ══ -->
+    <div id="tab-results">
+      <div class="stats-bento anim-slide" style="animation-delay:.12s">
+        <div class="stat-tile">
+          <div class="stat-tile-label">Avg Wait Time</div>
+          <div id="avg-waiting" class="stat-tile-val">—</div>
+          <div class="stat-tile-unit">milliseconds</div>
+        </div>
+        <div class="stat-tile">
+          <div class="stat-tile-label">Avg Turnaround</div>
+          <div id="avg-turnaround" class="stat-tile-val">—</div>
+          <div class="stat-tile-unit">milliseconds</div>
+        </div>
+        <div class="stat-tile">
+          <div class="stat-tile-label">Processes</div>
+          <div id="proc-count" class="stat-tile-val">—</div>
+          <div class="stat-tile-unit">total scheduled</div>
+        </div>
+      </div>
+      <div class="card results-card anim-slide" style="animation-delay:.16s">
+        <div class="card-hd">
+          <div class="card-hd-l">
+            <div class="card-hd-icon">
+              <span class="material-symbols-rounded">analytics</span>
+            </div>
+            <span class="card-title">Scheduling Results</span>
+          </div>
+          <span id="results-algo-badge" class="algo-badge">—</span>
+        </div>
+        <div style="overflow-x:auto;">
+          <table>
+            <thead><tr>
+              <th>#</th><th>PID</th><th>Type</th><th>Priority</th>
+              <th>Arrival</th><th>Burst</th><th>Wait</th><th>TAT</th>
+            </tr></thead>
+            <tbody id="results-tbody">
+              <tr><td colspan="8"><div class="empty-state">
+                <span class="material-symbols-rounded">data_exploration</span>
+                <p>Add processes and click Calculate Schedule</p>
+              </div></td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══ GANTT TAB ══ -->
+    <div id="tab-gantt" style="display:none;" class="card gantt-card">
+      <div class="card-hd">
+        <div class="card-hd-l">
+          <div class="card-hd-icon">
+            <span class="material-symbols-rounded">timeline</span>
+          </div>
+          <span class="card-title">Gantt Chart</span>
+        </div>
+      </div>
+      <div class="card-body">
+        <div id="gantt-container">
+          <div class="empty-state"><span class="material-symbols-rounded">timeline</span><p>Run a schedule first.</p></div>
+        </div>
+        <div id="gantt-legend" style="margin-top:12px;display:none;flex-wrap:wrap;gap:8px;"></div>
+      </div>
+    </div>
+
+    <!-- ══ COMPARISON TAB ══ -->
+    <div id="tab-comparison" style="display:none;" class="card cmp-card">
+      <div class="card-hd">
+        <div class="card-hd-l">
+          <div class="card-hd-icon">
+            <span class="material-symbols-rounded">compare</span>
+          </div>
+          <span class="card-title">Algorithm Comparison</span>
+        </div>
+      </div>
+      <div style="overflow-x:auto;">
+        <table>
+          <thead><tr>
+            <th>Algorithm</th><th>Avg Wait</th><th>Avg TAT</th>
+            <th>Complexity</th><th>Structure</th><th>Mode</th>
+          </tr></thead>
+          <tbody id="comparison-tbody">
+            <tr><td colspan="6"><div class="empty-state"><span class="material-symbols-rounded">compare</span><p>Run a schedule to compare.</p></div></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- ══ DAA TAB ══ -->
+    <div id="tab-daa" style="display:none;">
+      <div id="daa-content" class="daa-grid">
+        <div class="empty-state" style="grid-column:1/-1;">
+          <span class="material-symbols-rounded">functions</span><p>Loading DAA data...</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══ MONITOR TAB ══ -->
+    <div id="tab-monitor" style="display:none;" class="monitor-col">
+
+      <!-- Gauges Row -->
+      <div class="gauges-row">
+
+        <!-- CPU Gauge -->
+        <div class="gauge-card">
+          <div class="gauge-title">CPU Usage</div>
+          <div class="gauge-svg-wrap">
+            <svg class="gauge-svg" viewBox="0 0 100 100">
+              <circle class="gauge-ring-bg" cx="50" cy="50" r="40" fill="none" stroke-width="10"/>
+              <circle id="gauge-circle" class="gauge-ring" cx="50" cy="50" r="40" fill="none"
+                stroke="var(--gold)" stroke-width="10" stroke-linecap="round"
+                stroke-dasharray="251.2" stroke-dashoffset="251.2"/>
+            </svg>
+            <div class="gauge-inner">
+              <span id="cpu-pct-text" class="gauge-pct">0%</span>
+              <span class="gauge-sub">CPU</span>
+            </div>
+          </div>
+          <div class="gauge-footer">
+            <div class="gauge-ft-row">
+              <span class="gauge-ft-lbl">Freq</span>
+              <span id="cpu-freq" class="gauge-ft-val">— MHz</span>
+            </div>
+            <div class="gauge-ft-row">
+              <span class="gauge-ft-lbl">Cores</span>
+              <span id="cpu-cores-label" class="gauge-ft-val">—</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- RAM -->
+        <div class="ram-card" style="flex:1;">
+          <div class="gauge-title" style="font-size:9px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:2px;margin-bottom:16px;">Memory</div>
+          <div class="bar-wrap">
+            <div class="bar-label-row">
+              <span class="bar-lbl">RAM</span>
+              <span id="ram-text" class="bar-val">—</span>
+            </div>
+            <div class="bar-track">
+              <div id="ram-bar" class="bar-fill" style="width:0%;background:linear-gradient(90deg,var(--teal),var(--blue));"></div>
+            </div>
+            <div id="ram-pct" class="bar-pct">0%</div>
+          </div>
+          <div class="bar-wrap">
+            <div class="bar-label-row">
+              <span class="bar-lbl">Swap</span>
+              <span id="swap-text" class="bar-val">—</span>
+            </div>
+            <div class="bar-track" style="height:6px;">
+              <div id="swap-bar" class="bar-fill" style="width:0%;background:var(--gold);"></div>
+            </div>
+          </div>
+          <div class="ram-avail-row">Available: <span id="ram-avail">—</span></div>
+        </div>
+
+        <!-- Disk Gauge -->
+        <div class="gauge-card">
+          <div class="gauge-title">Disk</div>
+          <div class="gauge-svg-wrap" style="width:96px;height:96px;">
+            <svg class="gauge-svg" viewBox="0 0 100 100">
+              <circle class="gauge-ring-bg" cx="50" cy="50" r="38" fill="none" stroke-width="14"/>
+              <circle id="disk-circle" class="gauge-ring" cx="50" cy="50" r="38" fill="none"
+                stroke="var(--pink)" stroke-width="14" stroke-linecap="round"
+                stroke-dasharray="238.8" stroke-dashoffset="238.8"/>
+            </svg>
+            <div class="gauge-inner">
+              <span id="disk-pct-text" style="font-size:14px;font-weight:700;color:var(--text);font-family:'DM Mono',monospace;">0%</span>
+            </div>
+          </div>
+          <div class="gauge-footer">
+            <div class="gauge-ft-row"><span class="gauge-ft-lbl">Used</span><span id="disk-used" class="gauge-ft-val">—</span></div>
+            <div class="gauge-ft-row"><span class="gauge-ft-lbl">Total</span><span id="disk-total" class="gauge-ft-val">—</span></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- CPU Sparkline -->
+      <div class="card sparkline-card">
+        <div class="card-hd">
+          <div class="card-hd-l">
+            <div class="card-hd-icon"><span class="material-symbols-rounded">show_chart</span></div>
+            <span class="card-title">CPU History <span style="font-weight:400;color:var(--text3);font-size:9px;">(last 60s)</span></span>
+          </div>
+          <div style="display:flex;align-items:center;gap:6px;font-size:10px;color:var(--green);font-weight:700;font-family:'DM Mono',monospace;">
+            <span class="pulse" style="width:6px;height:6px;border-radius:50%;background:var(--green);display:inline-block;"></span>
+            LIVE
+          </div>
+        </div>
+        <div class="card-body" style="padding:14px 20px;">
+          <div style="position:relative;padding-left:28px;height:120px;">
+            <canvas id="cpu-sparkline"></canvas>
+            <div style="position:absolute;left:0;top:0;height:100%;display:flex;flex-direction:column;justify-content:space-between;pointer-events:none;">
+              <span style="font-size:8px;color:var(--text3);font-family:'DM Mono',monospace;">100</span>
+              <span style="font-size:8px;color:var(--text3);font-family:'DM Mono',monospace;">50</span>
+              <span style="font-size:8px;color:var(--text3);font-family:'DM Mono',monospace;">0</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Core Breakdown -->
+      <div class="card">
+        <div class="card-hd">
+          <div class="card-hd-l">
+            <div class="card-hd-icon" style="background:rgba(245,200,66,0.10);">
+              <span class="material-symbols-rounded" style="color:var(--gold);">developer_board</span>
+            </div>
+            <span class="card-title">Core Breakdown</span>
+          </div>
+        </div>
+        <div class="card-body">
+          <div id="core-grid" class="cores-grid">
+            <p style="font-size:12px;color:var(--text3);grid-column:1/-1;">Loading cores...</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Top OS Processes -->
+      <div class="card">
+        <div class="card-hd">
+          <div class="card-hd-l">
+            <div class="card-hd-icon" style="background:rgba(96,165,250,0.10);">
+              <span class="material-symbols-rounded" style="color:var(--blue);">view_list</span>
+            </div>
+            <span class="card-title">Top OS Processes <span style="font-weight:400;color:var(--text3);font-size:9px;">(by CPU%)</span></span>
+          </div>
+          <div style="display:flex;align-items:center;gap:5px;font-size:10px;color:var(--teal);font-weight:700;font-family:'DM Mono',monospace;">
+            <span class="pulse" style="width:5px;height:5px;border-radius:50%;background:var(--teal);display:inline-block;"></span>
+            2s
+          </div>
+        </div>
+        <div style="overflow-x:auto;">
+          <table>
+            <thead><tr>
+              <th>PID</th><th>Name</th><th>CPU%</th><th>MEM%</th>
+              <th>Threads</th><th>Status</th><th>Type</th>
+            </tr></thead>
+            <tbody id="sys-proc-tbody">
+              <tr><td colspan="7"><div class="empty-state" style="padding:28px;">
+                <span class="material-symbols-rounded">monitor_heart</span>
+                <p>Switch to Live Monitor tab to load.</p>
+              </div></td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══ HISTORY TAB ══ -->
+    <div id="tab-history" style="display:none;" class="card hist-card">
+      <div class="card-hd">
+        <div class="card-hd-l">
+          <div class="card-hd-icon"><span class="material-symbols-rounded">history</span></div>
+          <span class="card-title">Run History</span>
+        </div>
+        <button class="refresh-btn" onclick="loadHistory()">
+          <span class="material-symbols-rounded" style="font-size:14px;vertical-align:middle;">refresh</span>
+          Refresh
+        </button>
+      </div>
+      <div style="overflow-x:auto;">
+        <table>
+          <thead><tr>
+            <th>Run</th><th>Algorithm</th><th>Procs</th>
+            <th>Avg Wait</th><th>Avg TAT</th><th>Confidence</th><th>Ran At</th>
+          </tr></thead>
+          <tbody id="history-tbody">
+            <tr><td colspan="7"><div class="empty-state">
+              <span class="material-symbols-rounded">history</span><p>No history yet.</p>
+            </div></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+  </div><!-- /right-col -->
+</main>
+
+<footer>
+  <p>Smart Process Scheduling System v2.1 &nbsp;·&nbsp; ML + OS + DBMS + DAA + Live Monitor &nbsp;·&nbsp; DINESH V</p>
+</footer>
+</div><!-- /app-wrapper -->
+
+<script>
+/* ═══════════════════════════════════════════
+   CONFIG & STATE
+═══════════════════════════════════════════ */
+const BASE = "http://localhost:5000";
+const PALETTE = ["#f5c842","#2dd4bf","#a78bfa","#f472b6","#60a5fa","#4ade80","#f97316","#fb7185","#06b6d4","#84cc16"];
+const _pc={};let _ci=0;
+const pclr=pid=>{ if(!_pc[pid])_pc[pid]=PALETTE[_ci++%PALETTE.length]; return _pc[pid]; };
+
+/* ═══════════════════════════════════════════
+   THEME
+═══════════════════════════════════════════ */
+function toggleTheme(){
+  const html=document.documentElement;
+  const isDark=html.getAttribute('data-theme')==='dark';
+  html.setAttribute('data-theme',isDark?'light':'dark');
+  document.getElementById('theme-icon').textContent=isDark?'dark_mode':'light_mode';
+}
+
+/* ═══════════════════════════════════════════
+   TOAST
+═══════════════════════════════════════════ */
+function toast(msg,type="success"){
+  const el=document.getElementById("toast");
+  el.textContent=msg;
+  const styles={
+    success:{bg:"rgba(74,222,128,0.95)",color:"#000"},
+    error:{bg:"rgba(251,113,133,0.95)",color:"#000"},
+    info:{bg:"rgba(245,200,66,0.95)",color:"#000"}
+  };
+  const s=styles[type]||styles.success;
+  el.style.background=s.bg;el.style.color=s.color;
+  el.style.display="block";
+  setTimeout(()=>el.style.display="none",3500);
+}
+
+/* ═══════════════════════════════════════════
+   LOADING STATE
+═══════════════════════════════════════════ */
+function setLoading(id,on,icon,lbl){
+  const b=document.getElementById(id);b.disabled=on;
+  b.innerHTML=on
+    ?`<span class="material-symbols-rounded spin" style="font-size:18px;">progress_activity</span> Loading...`
+    :`<span class="material-symbols-rounded" style="font-size:18px;">${icon}</span> ${lbl}`;
+}
+
+/* ═══════════════════════════════════════════
+   TABS
+═══════════════════════════════════════════ */
+const TABS=["results","gantt","comparison","daa","monitor","history"];
+function switchTab(name,btn){
+  TABS.forEach(t=>{
+    const el=document.getElementById("tab-"+t);
+    if(el)el.style.display="none";
+  });
+  const active=document.getElementById("tab-"+name);
+  if(active){
+    if(name==="monitor")active.style.display="flex";
+    else active.style.display="block";
+  }
+  document.querySelectorAll(".tab-btn").forEach(b=>b.classList.remove("active"));
+  btn.classList.add("active");
+  if(name==="history")loadHistory();
+  if(name==="daa")loadDAA();
+  if(name==="monitor")startMonitor();
+}
+
+/* ═══════════════════════════════════════════
+   PROCESS LIST
+═══════════════════════════════════════════ */
+async function refreshProcessList(){
+  try{
+    const procs=await(await fetch(`${BASE}/processes`)).json();
+    document.getElementById("queue-count").textContent=procs.length;
+    const el=document.getElementById("process-list");
+    if(!procs.length){
+      el.innerHTML=`<div class="empty-state" style="padding:22px;"><span class="material-symbols-rounded">inbox</span><p>No processes added yet</p></div>`;
+      return;
+    }
+    el.innerHTML=procs.map(p=>`
+      <div class="proc-row">
+        <div class="proc-dot" style="background:${pclr(p.process_id)};box-shadow:0 0 6px ${pclr(p.process_id)}90;"></div>
+        <span class="proc-name">${p.process_id}</span>
+        <span class="proc-meta">BT:<b>${p.burst_time}</b></span>
+        <span class="proc-meta">AT:<b>${p.arrival_time}</b></span>
+        <span class="proc-meta">P:<b>${p.priority}</b></span>
+        <span class="chip ${p.process_type==='IO'?'chip-io':'chip-cpu'}" style="margin-left:auto;">${p.process_type}</span>
+      </div>`).join("");
+  }catch(e){}
+}
+
+/* ═══════════════════════════════════════════
+   ADD / CLEAR
+═══════════════════════════════════════════ */
+async function addProcess(){
+  const pid=document.getElementById("input-pid").value.trim();
+  const bt=parseInt(document.getElementById("input-burst").value);
+  const at=parseInt(document.getElementById("input-arrival").value);
+  const prio=parseInt(document.getElementById("input-priority").value)||5;
+  const type=document.getElementById("input-type").value;
+  if(!pid){toast("Enter a Process ID","error");return;}
+  if(isNaN(bt)||bt<1){toast("Burst Time must be ≥ 1","error");return;}
+  if(isNaN(at)||at<0){toast("Arrival Time must be ≥ 0","error");return;}
+  setLoading("btn-add",true,"add","Add");
+  try{
+    const r=await fetch(`${BASE}/add_process`,{
+      method:"POST",headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({process_id:pid,burst_time:bt,arrival_time:at,process_type:type,priority:prio})
+    });
+    const d=await r.json();if(!r.ok)throw new Error(d.error||"Error");
+    toast(`✓ ${pid} added`);
+    ["input-pid","input-burst","input-arrival","input-priority"].forEach(i=>document.getElementById(i).value="");
+    refreshProcessList();
+  }catch(e){toast(e.message,"error");}
+  finally{setLoading("btn-add",false,"add","Add");}
+}
+
+async function clearProcesses(){
+  await fetch(`${BASE}/clear_processes`,{method:"DELETE"});
+  refreshProcessList();toast("Queue cleared","info");
+}
+
+/* ═══════════════════════════════════════════
+   CALCULATE SCHEDULE
+═══════════════════════════════════════════ */
+async function calculateSchedule(){
+  setLoading("btn-calculate",true,"auto_awesome","Calculate Schedule");
+  try{
+    const r=await fetch(`${BASE}/generate_schedule`);
+    const d=await r.json();if(!r.ok)throw new Error(d.error||"Error");
+    const{primary,comparison,recommendation}=d;
+    if(!primary?.length)throw new Error("No results");
+    document.getElementById("ml-algo").textContent=recommendation.algorithm;
+    document.getElementById("ml-reason").textContent=recommendation.reason||"";
+    document.getElementById("ml-conf").textContent=recommendation.confidence+"%";
+    const banner=document.getElementById("ml-banner");
+    banner.style.display="flex";
+    renderResults(primary,recommendation.algorithm);
+    renderGantt(primary);
+    renderComparison(comparison);
+    document.getElementById("ml-badge").style.display="inline-flex";
+    toast(`✓ ${primary.length} processes via ${recommendation.algorithm} (${recommendation.confidence}%)`);
+  }catch(e){toast(e.message,"error");}
+  finally{setLoading("btn-calculate",false,"auto_awesome","Calculate Schedule");}
+}
+
+/* ═══════════════════════════════════════════
+   RENDER RESULTS
+═══════════════════════════════════════════ */
+function renderResults(procs,algoName){
+  const tw=procs.reduce((s,p)=>s+p.waiting_time,0);
+  const tt=procs.reduce((s,p)=>s+p.turnaround_time,0);
+  document.getElementById("avg-waiting").textContent=(tw/procs.length).toFixed(2);
+  document.getElementById("avg-turnaround").textContent=(tt/procs.length).toFixed(2);
+  document.getElementById("proc-count").textContent=procs.length;
+  document.getElementById("results-algo-badge").textContent=algoName;
+  document.getElementById("results-tbody").innerHTML=procs.map(p=>`
+    <tr class="anim-fade">
+      <td style="font-family:'DM Mono',monospace;color:var(--text3);">#${p.order}</td>
+      <td>
+        <span class="pid-tag" style="background:${pclr(p.process_id)}18;color:${pclr(p.process_id)};">
+          <span style="width:6px;height:6px;border-radius:50%;background:${pclr(p.process_id)};box-shadow:0 0 5px ${pclr(p.process_id)};"></span>
+          ${p.process_id}
+        </span>
+      </td>
+      <td><span class="chip ${p.process_type==='IO'?'chip-io':'chip-cpu'}">${p.process_type||'CPU'}</span></td>
+      <td style="font-family:'DM Mono',monospace;color:var(--text3);">${p.priority||5}</td>
+      <td style="font-family:'DM Mono',monospace;color:var(--text3);">${p.arrival_time}</td>
+      <td style="font-family:'DM Mono',monospace;color:var(--text2);">${p.burst_time}</td>
+      <td style="font-family:'DM Mono',monospace;font-weight:700;color:var(--teal);">${p.waiting_time}</td>
+      <td style="font-family:'DM Mono',monospace;font-weight:700;color:var(--gold);">${p.turnaround_time}</td>
+    </tr>`).join("");
+}
+
+/* ═══════════════════════════════════════════
+   RENDER GANTT
+═══════════════════════════════════════════ */
+function renderGantt(procs){
+  const c=document.getElementById("gantt-container");
+  if(!procs?.length)return;
+  const maxT=Math.max(...procs.map(p=>p.finish_time||0));
+  const sc=100/maxT;
+  c.innerHTML=`
+    <div style="display:flex;flex-direction:column;gap:8px;">
+      ${procs.map(p=>{
+        const clr=pclr(p.process_id);
+        const lp=((p.start_time||0)*sc).toFixed(2);
+        const wp=(p.burst_time*sc).toFixed(2);
+        const ap=(p.arrival_time*sc).toFixed(2);
+        const ww=(((p.start_time||0)-p.arrival_time)*sc).toFixed(2);
+        return `<div class="gantt-row-wrap">
+          <div class="gantt-pid">${p.process_id}</div>
+          <div class="gantt-track">
+            ${parseFloat(ww)>0?`<div class="gantt-wait-bg" style="left:${ap}%;width:${ww}%;background:${clr};"></div>`:""}
+            <div class="gantt-block" style="left:${lp}%;width:${wp}%;background:${clr};box-shadow:0 0 12px ${clr}50;">${p.process_id}</div>
+          </div>
+          <div class="gantt-meta">W:${p.waiting_time} T:${p.turnaround_time}</div>
+        </div>`;
+      }).join("")}
+    </div>
+    <div style="margin-top:8px;position:relative;margin-left:48px;margin-right:90px;height:16px;">
+      ${(()=>{const t=[];const st=Math.max(1,Math.floor(maxT/10));for(let i=0;i<=maxT;i+=st)t.push(`<div style="position:absolute;font-size:8px;color:var(--text3);font-family:'DM Mono',monospace;left:${(i*sc).toFixed(1)}%;transform:translateX(-50%)">${i}</div>`);return t.join("");})()}
+    </div>
+    <div style="margin-left:48px;margin-right:90px;height:1px;background:var(--border2);"></div>
+    <p style="font-size:9px;color:var(--text3);text-align:center;margin-top:8px;letter-spacing:2px;text-transform:uppercase;">← Time (ms) →</p>`;
+  const lg=document.getElementById("gantt-legend");
+  lg.style.display="flex";
+  lg.innerHTML=procs.map(p=>`
+    <span style="display:inline-flex;align-items:center;gap:5px;padding:3px 10px;border-radius:6px;font-size:10px;font-weight:700;font-family:'DM Mono',monospace;background:${pclr(p.process_id)}18;color:${pclr(p.process_id)};border:1px solid ${pclr(p.process_id)}30;">
+      <span style="width:6px;height:6px;border-radius:50%;background:${pclr(p.process_id)};"></span>${p.process_id}
+    </span>`).join("");
+}
+
+/* ═══════════════════════════════════════════
+   RENDER COMPARISON
+═══════════════════════════════════════════ */
+function renderComparison(comparison){
+  if(!comparison?.length)return;
+  const minW=Math.min(...comparison.filter(c=>!c.error).map(c=>c.avg_waiting));
+  document.getElementById("comparison-tbody").innerHTML=comparison.map(c=>{
+    if(c.error)return`<tr><td style="font-weight:700;color:var(--text);">${c.algorithm}</td><td colspan="5" style="color:var(--red);">${c.error}</td></tr>`;
+    const best=c.avg_waiting===minW,rec=c.is_recommended;
+    return`<tr ${best?'class="cmp-best"':''}>
+      <td>
+        <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
+          <span style="font-weight:700;color:var(--text);">${c.algorithm}</span>
+          ${rec?`<span class="chip chip-ml">ML</span>`:""}
+          ${best?`<span class="chip chip-best">Best</span>`:""}
+        </div>
+      </td>
+      <td style="font-family:'DM Mono',monospace;font-weight:700;color:${best?'var(--teal)':'var(--text2)'};">${c.avg_waiting}</td>
+      <td style="font-family:'DM Mono',monospace;color:var(--text2);">${c.avg_turnaround}</td>
+      <td><span style="font-family:'DM Mono',monospace;font-size:11px;padding:3px 8px;border-radius:6px;background:var(--bg2);color:var(--gold);border:1px solid var(--border2);">${c.time_complexity}</span></td>
+      <td style="font-size:11px;color:var(--text3);">${c.data_structure}</td>
+      <td><span class="chip ${c.preemptive?'chip-pre':'chip-nonpre'}">${c.preemptive?'Preemptive':'Non-preemptive'}</span></td>
+    </tr>`;
+  }).join("");
+}
+
+/* ═══════════════════════════════════════════
+   DAA
+═══════════════════════════════════════════ */
+async function loadDAA(){
+  const el=document.getElementById("daa-content");
+  try{
+    const data=await(await fetch(`${BASE}/complexity`)).json();
+    const icons={FCFS:"queue",SJF:"linear_scale",Priority:"priority_high","Round Robin":"loop","Smart (ML)":"psychology"};
+    const clrs={FCFS:"var(--blue)",SJF:"var(--teal)",Priority:"var(--gold)","Round Robin":"var(--pink)","Smart (ML)":"var(--purple)"};
+    el.innerHTML=Object.entries(data).map(([name,info])=>{
+      const c=clrs[name]||"var(--gold)";
+      return`<div class="daa-card anim-slide" style="border-top:3px solid ${c.replace('var(','').replace(')','')};border-top-color:${c};">
+        <div class="daa-hd">
+          <span class="material-symbols-rounded" style="color:${c};font-size:20px;">${icons[name]||"functions"}</span>
+          <span class="daa-name">${name}</span>
+          ${info.preemptive?`<span class="chip chip-pre" style="margin-left:auto;">Pre</span>`:""}
+        </div>
+        <div class="complexity-grid">
+          <div class="cplx-box"><div class="cplx-lbl">Time</div><div class="cplx-val" style="color:${c};">${info.time}</div></div>
+          <div class="cplx-box"><div class="cplx-lbl">Space</div><div class="cplx-val" style="color:${c};">${info.space}</div></div>
+        </div>
+        <div class="daa-struct">Structure: <b>${info.structure}</b></div>
+        <p class="daa-desc">${info.description}</p>
+      </div>`;
+    }).join("");
+  }catch(e){
+    el.innerHTML=`<div class="empty-state" style="grid-column:1/-1;"><span class="material-symbols-rounded">functions</span><p>Backend not running.</p></div>`;
+  }
+}
+
+/* ═══════════════════════════════════════════
+   HISTORY
+═══════════════════════════════════════════ */
+async function loadHistory(){
+  try{
+    const runs=await(await fetch(`${BASE}/history`)).json();
+    const tbody=document.getElementById("history-tbody");
+    if(!runs.length){
+      tbody.innerHTML=`<tr><td colspan="7"><div class="empty-state"><span class="material-symbols-rounded">history</span><p>No history yet.</p></div></td></tr>`;
+      return;
+    }
+    tbody.innerHTML=runs.map(r=>`<tr>
+      <td style="font-family:'DM Mono',monospace;color:var(--text3);">#${r.id}</td>
+      <td style="font-weight:700;color:var(--text);">${r.algorithm_used}</td>
+      <td style="font-family:'DM Mono',monospace;color:var(--text3);">${r.num_processes}</td>
+      <td style="font-family:'DM Mono',monospace;font-weight:700;color:var(--teal);">${r.avg_waiting}</td>
+      <td style="font-family:'DM Mono',monospace;font-weight:700;color:var(--gold);">${r.avg_turnaround}</td>
+      <td style="font-family:'DM Mono',monospace;color:var(--text3);">${r.ml_confidence}%</td>
+      <td style="font-size:10px;color:var(--text3);">${r.ran_at}</td>
+    </tr>`).join("");
+  }catch(e){}
+}
+
+/* ═══════════════════════════════════════════
+   MODEL INFO
+═══════════════════════════════════════════ */
+async function loadModelInfo(){
+  try{
+    const d=await(await fetch(`${BASE}/model_info`)).json();
+    document.getElementById("mi-model").textContent=d.model_type||"—";
+    document.getElementById("mi-samples").textContent=d.training_samples||"—";
+    document.getElementById("mi-estimators").textContent=d.n_estimators||"—";
+    document.getElementById("mi-features").textContent=(d.features||[]).join(", ");
+  }catch(e){}
+}
+
+/* ═══════════════════════════════════════════
+   LIVE MONITOR
+═══════════════════════════════════════════ */
+let _monitorInterval=null,_chartCtx=null,_monitorStarted=false;
+
+function startMonitor(){
+  if(_monitorStarted)return;
+  _monitorStarted=true;
+  document.getElementById("live-indicator").style.display="inline-flex";
+  const canvas=document.getElementById("cpu-sparkline");
+  canvas.width=canvas.offsetWidth||600;
+  canvas.height=canvas.offsetHeight||120;
+  _chartCtx=canvas.getContext("2d");
+  fetchMonitorData();
+  _monitorInterval=setInterval(fetchMonitorData,2000);
+}
+
+async function fetchMonitorData(){
+  try{
+    const[sr,hr]=await Promise.all([fetch(`${BASE}/system/stats`),fetch(`${BASE}/system/history`)]);
+    const stats=await sr.json(),hist=await hr.json();
+    if(stats.error)return;
+    updateGauges(stats);
+    updateCores(stats.cpu.per_core_pct);
+    updateProcessTable(stats.processes);
+    updateChart(hist);
+  }catch(e){}
+}
+
+function updateGauges(s){
+  const cpu=s.cpu.total_pct,mem=s.memory,dsk=s.disk;
+  const offset=251.2-(cpu/100)*251.2;
+  const gc=document.getElementById("gauge-circle");
+  gc.style.strokeDashoffset=offset;
+  gc.style.stroke=cpu>80?"var(--red)":cpu>50?"var(--gold)":"var(--teal)";
+  document.getElementById("cpu-pct-text").textContent=cpu+"%";
+  document.getElementById("cpu-freq").textContent=(s.cpu.freq_mhz||"—")+" MHz";
+  document.getElementById("cpu-cores-label").textContent=`${s.cpu.physical_cores}P / ${s.cpu.logical_cores}L`;
+  document.getElementById("ram-bar").style.width=mem.pct+"%";
+  document.getElementById("ram-pct").textContent=mem.pct+"%";
+  document.getElementById("ram-text").textContent=`${mem.used_gb}/${mem.total_gb}GB`;
+  document.getElementById("ram-avail").textContent=mem.available_gb+"GB";
+  document.getElementById("swap-bar").style.width=mem.swap_pct+"%";
+  document.getElementById("swap-text").textContent=`${mem.swap_used_gb}GB`;
+  if(dsk&&dsk.pct!==undefined){
+    document.getElementById("disk-circle").style.strokeDashoffset=238.8-(dsk.pct/100)*238.8;
+    document.getElementById("disk-pct-text").textContent=dsk.pct+"%";
+    document.getElementById("disk-used").textContent=dsk.used_gb+"GB";
+    document.getElementById("disk-total").textContent=dsk.total_gb+"GB";
+  }
+}
+
+function updateCores(cores){
+  if(!cores?.length)return;
+  document.getElementById("core-grid").innerHTML=cores.map((pct,i)=>{
+    const clr=pct>80?"var(--red)":pct>50?"var(--gold)":"var(--teal)";
+    return`<div class="core-tile">
+      <div class="core-label-row">
+        <span class="core-lbl">Core ${i}</span>
+        <span class="core-pct-lbl" style="color:${clr};">${pct}%</span>
+      </div>
+      <div class="core-bar-track">
+        <div class="core-bar-fill" style="width:${pct}%;background:${clr};"></div>
+      </div>
+    </div>`;
+  }).join("");
+}
+
+function updateProcessTable(procs){
+  if(!procs?.length)return;
+  document.getElementById("sys-proc-tbody").innerHTML=procs.map(p=>{
+    const sc=p.status==="running"?"chip-run":p.status==="sleeping"?"chip-slp":"chip-wait";
+    return`<tr>
+      <td style="font-family:'DM Mono',monospace;color:var(--text3);">${p.pid}</td>
+      <td style="font-weight:600;color:var(--text);max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${p.name}</td>
+      <td>
+        <div style="display:flex;align-items:center;gap:8px;">
+          <div style="width:56px;height:5px;background:var(--bg2);border-radius:3px;overflow:hidden;border:1px solid var(--border);">
+            <div style="width:${Math.min(p.cpu_pct,100)}%;height:100%;background:var(--gold);border-radius:3px;"></div>
+          </div>
+          <span style="font-family:'DM Mono',monospace;font-weight:700;font-size:11px;color:var(--text2);">${p.cpu_pct}%</span>
+        </div>
+      </td>
+      <td style="font-family:'DM Mono',monospace;color:var(--text3);">${p.mem_pct}%</td>
+      <td style="font-family:'DM Mono',monospace;color:var(--text3);">${p.threads}</td>
+      <td><span class="chip ${sc}">${p.status}</span></td>
+      <td><span class="chip ${p.type==='CPU'?'chip-cpu':'chip-io'}">${p.type}</span></td>
+    </tr>`;
+  }).join("");
+}
+
+function updateChart(hist){
+  if(!hist?.length||!_chartCtx)return;
+  const canvas=document.getElementById("cpu-sparkline");
+  canvas.width=canvas.offsetWidth||550;canvas.height=canvas.offsetHeight||120;
+  const ctx=_chartCtx,W=canvas.width,H=canvas.height;
+  const PL=4,PR=8,PT=8,PB=8,cW=W-PL-PR,cH=H-PT-PB;
+  ctx.clearRect(0,0,W,H);
+  // Grid
+  [0,25,50,75,100].forEach(v=>{
+    const y=PT+cH-(v/100)*cH;
+    ctx.beginPath();ctx.moveTo(PL,y);ctx.lineTo(W-PR,y);
+    ctx.strokeStyle="rgba(255,255,255,0.05)";ctx.lineWidth=1;ctx.stroke();
+  });
+  if(hist.length<2)return;
+  const pts=hist.map((d,i)=>({
+    x:PL+(i/(hist.length-1))*cW,
+    y:PT+cH-(Math.min(d.cpu,100)/100)*cH
+  }));
+  // Fill
+  const grad=ctx.createLinearGradient(0,PT,0,PT+cH);
+  grad.addColorStop(0,"rgba(245,200,66,0.28)");
+  grad.addColorStop(1,"rgba(245,200,66,0)");
+  ctx.beginPath();ctx.moveTo(pts[0].x,PT+cH);
+  pts.forEach(p=>ctx.lineTo(p.x,p.y));
+  ctx.lineTo(pts[pts.length-1].x,PT+cH);
+  ctx.closePath();ctx.fillStyle=grad;ctx.fill();
+  // Line
+  ctx.beginPath();
+  pts.forEach((p,i)=>i===0?ctx.moveTo(p.x,p.y):ctx.lineTo(p.x,p.y));
+  ctx.strokeStyle="var(--gold)";ctx.lineWidth=2;ctx.lineJoin="round";ctx.stroke();
+  // Dot
+  const last=pts[pts.length-1];
+  ctx.beginPath();ctx.arc(last.x,last.y,4,0,Math.PI*2);
+  ctx.fillStyle="#f5c842";ctx.fill();
+  ctx.beginPath();ctx.arc(last.x,last.y,8,0,Math.PI*2);
+  ctx.fillStyle="rgba(245,200,66,0.2)";ctx.fill();
+  const lv=hist[hist.length-1].cpu;
+  ctx.font="bold 10px 'DM Mono',monospace";
+  ctx.fillStyle="#f5c842";
+  ctx.fillText(lv+"%",Math.min(last.x+12,W-36),Math.max(last.y-10,PT+12));
+}
+
+/* ═══════════════════════════════════════════
+   KEYBOARD SHORTCUTS
+═══════════════════════════════════════════ */
+["input-pid","input-burst","input-arrival","input-priority"].forEach(id=>{
+  const el=document.getElementById(id);
+  if(el)el.addEventListener("keydown",e=>{if(e.key==="Enter")addProcess();});
+});
+
+/* ═══════════════════════════════════════════
+   INIT
+═══════════════════════════════════════════ */
+refreshProcessList();
+loadModelInfo();
+loadDAA();
+</script>
+</body>
+</html>
